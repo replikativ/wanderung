@@ -80,4 +80,5 @@
         (do
           (println "➜ Start migrating from " (first direction) "to" (second direction) "...")
           (migrate direction (-> source slurp read-string) (-> target slurp read-string))
-          (println "  ✓ Done"))))))
+          (println "  ✓ Done")
+          (System/exit 0))))))

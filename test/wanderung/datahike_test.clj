@@ -56,9 +56,11 @@
                  :where [?e :name _]]
             q2 '[:find ?n
                  :where [?e :name ?n]]]
-        (is (= (d/q q1 @source-conn)
-               (d/q q1 @target-conn)))
-        (is (= (->> @source-conn :rschema :db/ident (into #{}))
-               (->> @target-conn :rschema :db/ident (into #{}))))
-        (is (= (d/q q2 @source-conn)
-               (d/q q2 @target-conn)))))))
+        (is (=(d/q q1 @target-conn)
+              (d/q q1 @source-conn)))
+        (is (= (->> @target-conn :rschema :db/ident (into #{}))
+               (->> @source-conn :rschema :db/ident (into #{}))))
+        (is (= (d/q q2 @target-conn)
+               (d/q q2 @source-conn)))
+        (is (= (-> @target-conn :schema :name)
+               (-> @source-conn :schema :name)))))))
