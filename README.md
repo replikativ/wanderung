@@ -36,7 +36,7 @@ Alternatively open your Clojure project, add `io.lambdaforge/wanderung` to your 
 
 ## Tests
 
-Run tests with:
+Make sure to have [datomic dev-local](https://docs.datomic.com/cloud/dev-local.html) installed for the Datomic tests. Run tests with:
 
 ```bash
 ./bin/kaocha
