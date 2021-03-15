@@ -1,4 +1,4 @@
-{:name "your-database"
+{:db-name "your-database-name"
  :server-type :ion
  :region      "eu-west-1"
  :system      "your-system"

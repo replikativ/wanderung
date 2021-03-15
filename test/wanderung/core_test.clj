@@ -1,56 +1,74 @@
 (ns wanderung.core-test
-  (:require [clojure.test :refer :all]
-            [wanderung.core :refer [datomic-cloud->datahike]]
-            [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as gen]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [wanderung.core :refer [migrate]]
             [datahike.api :as d]
-            [datomic.api :as dt]))
+            [datomic.client.api :as dt])
+  (:import [java.util UUID]))
 
-(s/def ::name (s/and string? #(< 10 (count %) 100)))
+(def schema [{:db/ident       :name
+              :db/valueType   :db.type/string
+              :db/cardinality :db.cardinality/one}
+             {:db/ident       :sibling
+              :db/valueType   :db.type/ref
+              :db/cardinality :db.cardinality/many}])
+(def datahike-cfg {:store {:backend :mem
+                           :id      "wanderung-test"}})
+(def datomic-cfg {:server-type :dev-local
+                  :storage-dir :mem
+                  :system      "dev"})
+(def datomic-db-cfg {:db-name "wanderung-test"})
 
-;; TODO: use cloud datomic for testing ...
-#_(deftest datomic->datahike-test
+(defn database-reset-fixture
+  [test-function]
+  (let [datomic-client (dt/client datomic-cfg)]
+
+    (dt/delete-database datomic-client datomic-db-cfg)
+    (dt/create-database datomic-client datomic-db-cfg)
+
+    (d/delete-database datahike-cfg)
+    (d/create-database datahike-cfg)
+
+    (let [datomic-conn (dt/connect datomic-client datomic-db-cfg)]
+      (dt/transact datomic-conn {:tx-data schema}))
+
+    (test-function)
+    (dt/delete-database datomic-client datomic-db-cfg)))
+
+(use-fixtures :each database-reset-fixture)
+
+(deftest datomic->datahike-test
   (testing "Migrate data from Datomic to Datahike"
-    (let [schema [{:db/ident       :name
-                   :db/valueType   :db.type/string
-                   :db/cardinality :db.cardinality/one}
-                  {:db/ident       :sibling
-                   :db/valueType   :db.type/ref
-                   :db/cardinality :db.cardinality/many}]
-          datomic-uri "datomic:mem://migration-source"
-          datahike-uri "datahike:mem://migration-target"]
+    (let [datomic-conn (dt/connect (dt/client datomic-cfg) datomic-db-cfg) ]
 
-      (dt/delete-database datomic-uri)
-      (dt/create-database datomic-uri)
+      (dt/transact datomic-conn {:tx-data schema})
 
-      (d/delete-database datahike-uri)
-      (d/create-database datahike-uri)
+      ;; generate data in Datomic
+      (dotimes [n 5]
+        (let [possible-siblings (->> (dt/db datomic-conn)
+                                     (dt/q '[:find ?e :where [?e :name _]])
+                                     (take 10)
+                                     vec)
+              new-entities (->> (repeatedly 10 (fn [] (str (UUID/randomUUID))))
+                                (map (fn [entity]
+                                       (if (empty? possible-siblings)
+                                         {:name entity}
+                                         {:name entity :sibling (rand-nth possible-siblings)}))))]
+          (dt/transact datomic-conn {:tx-data (vec new-entities)})))
 
-      (let [datomic-conn (dt/connect datomic-uri)]
+      ;; migrate to Datahike
+      (migrate [:datomic-cloud :datahike] (merge datomic-db-cfg datomic-cfg) datahike-cfg)
 
-        ;; init schema in Datomic
-        @(dt/transact datomic-conn schema)
-
-        ;; generate data in Datomic
-        (dotimes [n 100]
-          (let [possible-siblings (->> (dt/db datomic-conn)
-                                       (dt/q '[:find ?e :where [?e :name _]])
-                                       (take 10)
-                                       vec)
-                new-entities (->> (gen/sample (s/gen ::name) 100)
-                                  (map (fn [entity]
-                                         (if (empty? possible-siblings)
-                                           {:name entity}
-                                           {:name entity :sibling (rand-nth possible-siblings)}))))]
-            @(dt/transact datomic-conn (vec new-entities))))
-
-        ;; migrate to Datahike
-        (datomic-cloud->datahike datomic-uri datahike-uri)
-
-        (let [datahike-conn (d/connect datahike-uri)
-              q1 '[:find (count ?e)
-                   :where [?e :name _]]
-              datomic-db (dt/db datomic-conn)]
-          (is (= (dt/q q1 datomic-db) (d/q q1 @datahike-conn)))
-          (is (= (mapv  :db/ident schema) (-> @datahike-conn :rschema :db/ident vec)))
-          )))))
+      (let [datahike-conn (d/connect datahike-cfg)
+            q1 '[:find (count ?e)
+                 :where [?e :name _]]
+            q2 '[:find ?n
+                 :where [?e :name ?n]]
+            datomic-db (dt/db datomic-conn)]
+        (is (= (dt/q q1 datomic-db)
+               (d/q q1 @datahike-conn)))
+        (is (= (->> (mapv :db/ident schema)
+                    (concat [:db.entity/attrs :db/ident :db.entity/preds])
+                    (into #{}))
+               (->> @datahike-conn :rschema :db/ident (into #{}))))
+        (is (= (into #{} (dt/q q2 datomic-db))
+               (d/q q2 @datahike-conn)))))))

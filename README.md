@@ -4,13 +4,13 @@ Migration tool for Datahike from and to other databases.
 
 ## Usage
 
-Make sure your source and target databases exist. You can run the migration on the commandline:
+Make sure your source and target databases exist. For this tool to run you need to have Clojure [CLI tools](https://clojure.org/guides/deps_and_cli). You can run the migration on the commandline:
 
 ```bash
-lein run -s datomic-cloud.edn -t datahike-pg.edn -d datomic-cloud:datahike
+clj -M:migrate -s datomic-cloud.edn -t datahike-pg.edn -d datomic-cloud:datahike
 ```
 
-Use `lein run -- -h` for further instructions. See the `*-example.edn` files for `dataomic-cloud` and `datahike-pg` example configurations.
+Use `clj -M:migrate -h` for further instructions. See the `*-example.edn` files for `dataomic-cloud` and `datahike-pg` example configurations.
 
 Alternatively open your Clojure project, add `io.lambdaforge/wanderung` to your dependencies, and start a REPL:
 
@@ -32,6 +32,14 @@ Alternatively open your Clojure project, add `io.lambdaforge/wanderung` to your 
 ;; if the database doesn't exist, wanderung will create a Datahike database
                            
 (w/migrate [:datomic-cloud :datahike] datomic-cfg datahike-cfg)
+```
+
+## Tests
+
+Run tests with:
+
+```bash
+./bin/kaocha
 ```
 
 ## License

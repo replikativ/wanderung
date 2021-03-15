@@ -1,0 +1,12 @@
+{:deps {org.clojure/clojure {:mvn/version "1.10.1"}
+        io.replikativ/datahike-jdbc {:mvn/version "0.1.2-SNAPSHOT"}
+        io.replikativ/datahike {:mvn/version "0.3.3" :exclusions [io.replikativ/konserve]}
+        com.cognitect/transit-clj {:mvn/version "0.8.313"}
+        com.datomic/dev-local {:mvn/version "0.9.225"}
+        org.clojure/tools.logging {:mvn/version "1.1.0"}
+        org.clojure/tools.cli {:mvn/version "1.0.194"}}
+ :paths ["src" "target/classes"]
+ :aliases {:dev {:extra-deps {org.clojure/test.check {:mvn/version "1.1.0"}}}
+           :migrate {:main-opts ["-m" "wanderung.core"]}
+           :test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.0.829"}}
+                  :extra-paths ["test"]}}}

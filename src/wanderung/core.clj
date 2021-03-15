@@ -5,26 +5,32 @@
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.string :refer [split]]
             [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [datahike-jdbc.core])
   (:gen-class))
 
 (defmulti migrate (fn [direction source-configuration target-configuration] direction))
 
 (defmethod migrate [:datomic-cloud :datahike] [_ datomic-config datahike-config]
-  (let [datomic-conn (dt/connect (dt/client (dissoc datomic-config :name)) {:db-name (:name datomic-config)})
-        datomic-data (wdc/extract-datomic-cloud-data datomic-conn)
+  (let [datomic-conn (do
+                       (log/debug "Connecting to Datomic...")
+                       (dt/connect (dt/client datomic-config) {:db-name (:db-name datomic-config)}))
+        datomic-data (do
+                       (log/debug "Extracting data...")
+                       (wdc/extract-datomic-cloud-data datomic-conn))
+        _ (log/debug "Done")
         datahike-conn (if (d/database-exists? datahike-config)
                         (do
-                          (println "➜ Connecting to Datahike...")
+                          (log/debug "Connecting to Datahike...")
                           (d/connect datahike-config))
                         (do
-                          (println "➜ Datahike database does not exist.")
-                          (println "➜ Creating database...")
+                          (log/debug "Datahike database does not exist.")
+                          (log/debug "Creating database...")
                           (d/create-database datahike-config)
-                          (println "  ✓ Done")
-                          (println "➜ Connecting to Datahike...")
+                          (log/debug "Done")
+                          (log/debug "Connecting to Datahike...")
                           (d/connect datahike-config)))]
-    (println "  ✓ Done")
+    (log/debug "Done")
     @(d/load-entities datahike-conn datomic-data)
     true))
 
@@ -56,14 +62,3 @@
           (println "➜ Start migrating from " (first direction) "to" (second direction) "...")
           (migrate direction (-> source slurp read-string) (-> target slurp read-string))
           (println "  ✓ Done"))))))
-
-(comment
-
-  (def cfg (-> "datahike-file.edn" slurp read-string))
-
-  (def conn (d/connect cfg))
-
-  (d/datoms @conn :eavt nil)
-
-
-  )
