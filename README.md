@@ -17,7 +17,7 @@ Alternatively open your Clojure project, add `io.lambdaforge/wanderung` to your 
 ```clojure
 (require '[wanderung.core :as w])
 
-(def datomic-cfg {:name "your-database"
+(def datomic-cfg {:db-name "your-database"
                   :server-type :ion
                   :region      "eu-west-1"
                   :system      "your-system"
