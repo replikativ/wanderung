@@ -2,6 +2,7 @@
   (:require [datahike.api :as d]
             [datomic.client.api :as dt]
             [wanderung.datomic-cloud :as wdc]
+            [wanderung.datahike :as wd]
             [clojure.tools.cli :refer [parse-opts]]
             [clojure.string :refer [split]]
             [clojure.java.io :as io]
@@ -32,6 +33,24 @@
                           (d/connect datahike-config)))]
     (log/debug "Done")
     @(d/load-entities datahike-conn datomic-data)
+    true))
+
+(defmethod migrate [:datahike :datahike] [_ source-config target-config]
+  (let [source-conn (d/connect source-config)
+        source-data (wd/extract-datahike-data source-conn)
+        target-conn (if (d/database-exists? target-config)
+                        (do
+                          (println "➜ Connecting to Datahike...")
+                          (d/connect target-config))
+                        (do
+                          (println "➜ Datahike database does not exist.")
+                          (println "➜ Creating database...")
+                          (d/create-database target-config)
+                          (println "  ✓ Done")
+                          (println "➜ Connecting to Datahike...")
+                          (d/connect target-config)))]
+    (println "  ✓ Done")
+    @(d/load-entities target-conn source-data)
     true))
 
 (defmethod migrate :default [direction _ _]
